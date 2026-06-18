@@ -22,10 +22,25 @@ function formatDate(dateStr) {
   return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
+function loadRecords() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistRecords(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
 export default function App() {
-  const [records, setRecords] = useState({});
+  const [records, setRecords] = useState(() => loadRecords());
   const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [view, setView] = useState("log"); // "log" | "calendar" | "history"
+  const [view, setView] = useState("log");
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
   const [calMonth, setCalMonth] = useState(() => {
@@ -34,24 +49,13 @@ export default function App() {
   });
 
   useEffect(() => {
-    (async () => {
-      try {
-        const result = await window.storage.get(STORAGE_KEY);
-        if (result) setRecords(JSON.parse(result.value));
-      } catch (e) {}
-    })();
-  }, []);
-
-  useEffect(() => {
     setNote(records[selectedDate]?.note || "");
     setSaved(false);
   }, [selectedDate, records]);
 
-  async function saveRecords(updated) {
+  function saveRecords(updated) {
     setRecords(updated);
-    try {
-      await window.storage.set(STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    persistRecords(updated);
   }
 
   function toggleSport(sportId) {
@@ -63,16 +67,15 @@ export default function App() {
     setSaved(false);
   }
 
-  async function saveNote() {
+  function saveNote() {
     const dayData = records[selectedDate] || { sports: [], note: "" };
-    await saveRecords({ ...records, [selectedDate]: { ...dayData, note } });
+    saveRecords({ ...records, [selectedDate]: { ...dayData, note } });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   const todaySports = records[selectedDate]?.sports || [];
 
-  // Stats
   const allDates = Object.keys(records).filter((d) => (records[d].sports?.length || 0) > 0);
   const totalDays = allDates.length;
   const sportCounts = {};
@@ -82,7 +85,6 @@ export default function App() {
   });
   const topSport = SPORTS.reduce((a, b) => (sportCounts[a.id] || 0) >= (sportCounts[b.id] || 0) ? a : b);
 
-  // Calendar helpers
   function getCalDays(year, month) {
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -105,7 +107,6 @@ export default function App() {
     return `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
-  // Sport emoji summary for a date (up to 3)
   function dateSportEmojis(dateStr) {
     const sports = records[dateStr]?.sports || [];
     return sports.slice(0, 4).map((sid) => SPORTS.find((s) => s.id === sid)?.emoji || "").join("");
@@ -119,7 +120,6 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", background: "#0f1117", minHeight: "100vh", color: "#f0f0f0", paddingBottom: 40 }}>
-      {/* Header */}
       <div style={{ background: "linear-gradient(135deg, #1a1f2e 0%, #0f1117 100%)", borderBottom: "1px solid #1e2535", padding: "20px 20px 0" }}>
         <div style={{ maxWidth: 480, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 2 }}>
@@ -142,14 +142,11 @@ export default function App() {
 
       <div style={{ maxWidth: 480, margin: "0 auto", padding: "0 16px" }}>
 
-        {/* ── LOG TAB ── */}
         {view === "log" && (
           <>
             <div style={{ marginTop: 20, marginBottom: 6 }}>
               <p style={{ fontSize: 13, color: "#a0b0c8", fontWeight: 600, margin: "0 0 4px" }}>{formatDate(selectedDate)}{selectedDate === todayStr() ? " — Today" : ""}</p>
             </div>
-
-            {/* Sport buttons */}
             <div style={{ marginBottom: 20 }}>
               <p style={{ fontSize: 11, color: "#5a6070", marginBottom: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Today's Activity</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -174,8 +171,6 @@ export default function App() {
                 })}
               </div>
             </div>
-
-            {/* Note */}
             <div style={{ marginBottom: 20 }}>
               <p style={{ fontSize: 11, color: "#5a6070", marginBottom: 8, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Notes</p>
               <textarea value={note} onChange={(e) => { setNote(e.target.value); setSaved(false); }}
@@ -190,8 +185,6 @@ export default function App() {
                 border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, transition: "all 0.2s",
               }}>{saved ? "✓ Saved" : "Save Note"}</button>
             </div>
-
-            {/* Stats strip */}
             <div style={{ background: "#161b26", borderRadius: 16, padding: "16px", display: "flex", gap: 16 }}>
               <div style={{ flex: 1, textAlign: "center" }}>
                 <div style={{ fontSize: 24, fontWeight: 800, color: "#7c9ef8" }}>{totalDays}</div>
@@ -200,7 +193,7 @@ export default function App() {
               <div style={{ width: 1, background: "#1e2535" }} />
               <div style={{ flex: 1, textAlign: "center" }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: "#a8c0ff" }}>{totalDays > 0 ? topSport.emoji : "—"}</div>
-                <div style={{ fontSize: 11, color: "#5a6070" }}>{totalDays > 0 ? topSport.label.split(" /")[0] : "No data"}</div>
+                <div style={{ fontSize: 11, color: "#5a6070" }}>{totalDays > 0 ? topSport.label.split("\n")[0] : "No data"}</div>
               </div>
               <div style={{ width: 1, background: "#1e2535" }} />
               <div style={{ flex: 1, textAlign: "center" }}>
@@ -211,24 +204,18 @@ export default function App() {
           </>
         )}
 
-        {/* ── CALENDAR TAB ── */}
         {view === "calendar" && (
           <div style={{ marginTop: 20 }}>
-            {/* Month nav */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <button onClick={prevMonth} style={{ background: "#161b26", border: "1px solid #1e2535", color: "#a0b0c8", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 16 }}>‹</button>
               <span style={{ fontSize: 16, fontWeight: 700, color: "#e0e8f8" }}>{MONTHS[calMonth.month]} {calMonth.year}</span>
               <button onClick={nextMonth} style={{ background: "#161b26", border: "1px solid #1e2535", color: "#a0b0c8", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 16 }}>›</button>
             </div>
-
-            {/* Day headers */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
               {DAYS.map((d) => (
                 <div key={d} style={{ textAlign: "center", fontSize: 11, color: "#5a6070", fontWeight: 600, padding: "4px 0", letterSpacing: "0.05em" }}>{d}</div>
               ))}
             </div>
-
-            {/* Calendar grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
               {calCells.map((day, i) => {
                 if (!day) return <div key={`empty-${i}`} />;
@@ -246,9 +233,7 @@ export default function App() {
                       outline: isToday && !isSelected ? "1px solid #3a5080" : "none",
                       minHeight: 52,
                     }}>
-                    <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isSelected ? "#fff" : isToday ? "#a8c0ff" : hasSports ? "#c0d0f0" : "#5a6070" }}>
-                      {day}
-                    </span>
+                    <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isSelected ? "#fff" : isToday ? "#a8c0ff" : hasSports ? "#c0d0f0" : "#5a6070" }}>{day}</span>
                     {emojis && (() => {
                       const sportList = (records[ds]?.sports || []).slice(0, 4);
                       const count = sportList.length;
@@ -275,32 +260,22 @@ export default function App() {
                 );
               })}
             </div>
-
-            {/* Legend */}
             <div style={{ marginTop: 16, background: "#161b26", borderRadius: 12, padding: "12px 16px" }}>
               <p style={{ fontSize: 11, color: "#5a6070", margin: "0 0 8px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Tap a day to log or edit</p>
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 3, background: "#7c9ef8" }} />
-                  <span style={{ fontSize: 11, color: "#8090a8" }}>Selected</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 3, background: "#161e30", border: "1px solid #3a5080" }} />
-                  <span style={{ fontSize: 11, color: "#8090a8" }}>Today</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 3, background: "#161e30" }} />
-                  <span style={{ fontSize: 11, color: "#8090a8" }}>Has activity</span>
-                </div>
+                {[["#7c9ef8","Selected"],["#161e30, border: 1px solid #3a5080","Today"],["#161e30","Has activity"]].map(([bg, label]) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: bg.split(",")[0] }} />
+                    <span style={{ fontSize: 11, color: "#8090a8" }}>{label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* ── HISTORY TAB ── */}
         {view === "history" && (
           <div style={{ marginTop: 20 }}>
-            {/* Sport breakdown */}
             <div style={{ background: "#161b26", borderRadius: 16, padding: "16px", marginBottom: 20 }}>
               <p style={{ fontSize: 11, color: "#5a6070", margin: "0 0 14px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Sport Breakdown</p>
               {SPORTS.map((sport) => {
@@ -318,8 +293,6 @@ export default function App() {
                 );
               })}
             </div>
-
-            {/* Day list */}
             {allDates.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: "#5a6070" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🏅</div>
@@ -340,7 +313,7 @@ export default function App() {
                       {(day.sports || []).map((sid) => {
                         const sp = SPORTS.find((s) => s.id === sid);
                         return sp ? (
-                          <span key={sid} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, background: "#1e2c50", color: "#a8c0ff", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <span key={sid} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, background: "#1e2c50", color: "#a8c0ff", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "pre-line" }}>
                             {sp.emoji} {sp.label}
                           </span>
                         ) : null;
