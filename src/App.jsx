@@ -249,7 +249,25 @@ export default function App() {
                     <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 400, color: isSelected ? "#fff" : isToday ? "#a8c0ff" : hasSports ? "#c0d0f0" : "#5a6070" }}>
                       {day}
                     </span>
-                    {emojis && <span style={{ fontSize: 12, lineHeight: 1 }}>{emojis}</span>}
+                    {emojis && (() => {
+                      const sportList = (records[ds]?.sports || []).slice(0, 4);
+                      const count = sportList.length;
+                      if (count === 1) {
+                        return <span style={{ fontSize: 11, textAlign: "center" }}>{SPORTS.find(s => s.id === sportList[0])?.emoji}</span>;
+                      } else if (count === 2) {
+                        return (
+                          <div style={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                            {sportList.map(sid => { const sp = SPORTS.find(s => s.id === sid); return sp ? <span key={sid} style={{ fontSize: 10 }}>{sp.emoji}</span> : null; })}
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, lineHeight: 1 }}>
+                            {sportList.map(sid => { const sp = SPORTS.find(s => s.id === sid); return sp ? <span key={sid} style={{ fontSize: 10, textAlign: "center" }}>{sp.emoji}</span> : null; })}
+                          </div>
+                        );
+                      }
+                    })()}
                     {hasSports && !emojis && (
                       <span style={{ width: 5, height: 5, borderRadius: "50%", background: isSelected ? "rgba(255,255,255,0.8)" : "#7c9ef8" }} />
                     )}
